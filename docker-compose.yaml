@@ -1,0 +1,20 @@
+version: "3"
+services:
+  neo4j:
+    image: "neo4j"
+    ports:
+      - 7474:7474
+      - 7687:7687
+  coder:
+    image: "cyferd-test/code-server:latest"
+    build:
+      context: .
+    ports:
+      - 9091:8080
+    volumes:
+      - "$PWD/.config:/home/coder/.config"
+      - "$PWD:/home/coder/project"
+    user: "0:0"
+    environment:
+      - "DOCKER_USER=$USER"
+      - "PASSWORD=CyferdTest!"
