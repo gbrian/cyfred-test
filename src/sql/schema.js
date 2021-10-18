@@ -56,6 +56,28 @@ export class RDBMSSchema {
         return this.mapSchemaRelations(tables)
     }
 
+    async parseSchemaDDL (ddl) {
+        let buffer = []
+        let fillingBuffer = false
+        const lines = ddl.split("\n")
+        const tables = []
+        for (let line of lines) {
+            if (line.indexOf(START_TABLE) !== -1) {
+                fillingBuffer = true
+            }
+            if (fillingBuffer) {
+                buffer.push(line)
+                if (line.indexOf(END_TABLE) !== -1) {
+                    fillingBuffer = false
+                    const table = this.buildTableFromSql(buffer.join(""))
+                    tables.push(table)
+                    buffer = []
+                }
+            }
+        }
+        return this.mapSchemaRelations(tables)
+    }
+
     /**
      * Maps relations to table definition
      * @param {Array: Table} tables 

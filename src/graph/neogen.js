@@ -1,14 +1,23 @@
-import { RDBMSSchema } from '../sql/schema'
 import { TABLE_TYPE } from '../sql/constants'
 import neo4j from 'neo4j-driver'
 
 export class NeoGenerator {
     driver = null
 
-    createSchemaFromDB (schemaFileName) {
-        const rdbsmSchema = new RDBMSSchema()
-        const tables = rdbsmSchema.extractTables(schemaFileName)
-        const sortedTables = this.sortTablesByDependencies(tables)
+    async createCypherFromDB (db, sample) {
+        const tables = await db.getTables()
+        const validTables = tables.filter(t => t.category !== TABLE_TYPE.unknown)
+        const sortedTables = this.sortTablesByDependencies(validTables)
+        const cypherDDL = await Promise.all(await sortedTables.map(async table => {
+            const recordReader = await db.read(table, sample || 100, sample)
+            const cypher = []
+            for await(let records of recordReader) {
+                cypher.push(this.generateCypher(table, records))
+            }
+            return cypher
+        }))
+        return cypherDDL.reduce((a, b) => a.concat(b), [])
+            .join("\n")
     }
 
     sortTablesByDependencies (tables) {
@@ -21,47 +30,73 @@ export class NeoGenerator {
         while (tables.length !== sortedTables.length) {
             const pending = tables.filter(t => sortedTables.indexOf(t) === -1)
             pending.forEach(t => {
+                const exRelations = t.relations
+                                        .filter(r => r.tableName !== t.name) // Self relation
+                                        .map(r => tableDict[r.tableName])
                 const fullFilled = t.category === TABLE_TYPE.final ||
-                _containTable(t.relations.map(r => tableDict[r.tableName]), sortedTables)
+                    _containTable(exRelations, sortedTables)
                 if (fullFilled) {
                     sortedTables.push(t)
                 }
             })
+            if (false) {
+                console.log(`SOERTING: \n
+                    ${pending.map(p => JSON.stringify({ name: p.name, relations: p.relations.map(r => [r.fromColumn, r.tableName, r.toColumn]) }))}\n
+                    ${sortedTables.map(s => s.name)}
+                `)
+            }
         }
         return sortedTables
     }
 
-    generateCypher (table, records) {
-        let cypher = null
-        let builder = null
+    generateNodeCypher (table) {
         const { name } = table
-        if (table.category === TABLE_TYPE.final) {
-            builder = (data, ix) => `CREATE (${'t'+ix}:${name} ${JSON.stringify(data, null, 2)})`
-        } else if (table.category === TABLE_TYPE.nm) {
-            const { relations } = table
-            const from = relations[0]
-            const to = relations[1]
-            builder = (data, ix) => {
-                const tl = `tl${ix}`
-                const tr = `tr${ix}`
-                const { tableName: tlName, fromColumn: tlFromColumn, toColumn: tlToColumn } = from
-                const { tableName: trName, fromColumn: trFromColumn, toColumn: trToColumn } = to
-                return (
-                    `MATCH (${tl}:${tlName}),(${tr}}:${trName})
-                    WHERE ${tl}.${tlFromColumn} = "${data[tlFromColumn]}"
-                        AND ${tr}.${trToColumn} = "${data[trToColumn]}"
-                    CREATE (${tl})-[${"r"+ix}:${name}]->(${tr})`
-                )
-            }
+        return (data, ix) => `CREATE (${'t'+ix}:${name} ${JSON.stringify(data, null, 2)})`
+    }
+
+    generateRelationsCypher (table) {
+        const { name } = table
+        const { relations } = table
+        const from = relations[0]
+        const to = relations[1] || from
+        return (data, ix) => {
+            const tl = `tl${ix}`
+            const tr = `tr${ix}`
+            const { tableName: tlName, fromColumn: tlFromColumn } = from
+            const { tableName: trName, toColumn: trToColumn } = to
+            return (
+                `MATCH (${tl}:${tlName}),(${tr}}:${trName})
+                WHERE ${tl}.${tlFromColumn} = "${data[tlFromColumn]}"
+                    AND ${tr}.${trToColumn} = "${data[trToColumn]}"
+                CREATE (${tl})-[${"r"+ix}:${name}]->(${tr})`
+            )
         }
-        return records.map(builder).join("\n")
+    }
+
+    generateCypher (table, records) {
+        if (table.category === TABLE_TYPE.final) {
+            const builder = this.generateNodeCypher(table)
+            return records.map(builder).join("\n")
+        } else if (table.category === TABLE_TYPE.nm) {
+            const builder = this.generateRelationsCypher(table)
+            return records.map(builder).join("\n")
+        } else if (table.category === TABLE_TYPE.composed) {
+            const nodeBuilder = this.generateNodeCypher(table)
+            const relationBuilder = this.generateRelationsCypher(table)
+            return [...records.map(nodeBuilder),
+                    ...records.map(relationBuilder)]
+                    .join("\n")
+        }
+        throw Error('generateCypher no builder ', table.name, table.category)
     }
 
     connect () {
-        this.driver = neo4j.connect(
+        this.driver = new neo4j()
+        this.driver.connect(
             'neo4j://localhost',
             neo4j.auth.basic('neo4j', 'CyferdTest!')
         )
+        return this.driver
     }
 
     disconnect () {
@@ -71,7 +106,7 @@ export class NeoGenerator {
     execCypher (cypher, database) {
         return new Promise((res, rej) => {
             const records = []
-            const session = driver.session({
+            const session = this.connect().session({
                 database,
                 defaultAccessMode: neo4j.session.WRITE
             })

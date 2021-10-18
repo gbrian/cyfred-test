@@ -1,5 +1,6 @@
 export const NORTHWIND_DATA_FILE = __dirname + '/../db/Northwind_test.sqlite'
 export const NORTHWIND_SCHEMA_FILE = __dirname + '/../db/Northwind_schema.sql'
+export const NORTHWIND_CYPHER_FILE = __dirname + '/../cypher/Northwind_test.cypher'
 export const NORTHWIND = {
     "Categories": {
       "columns": {
