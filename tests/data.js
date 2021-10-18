@@ -1,6 +1,6 @@
 import { expect, assert } from 'chai'
 import { NORTHWIND_DATA_FILE, NORTHWIND } from './northwind.expect'
-import { SqliteDataExtractor } from '../src/rdbms/sqlite'
+import { SqliteDataExtractor } from '../dist/rdbms/sqlite'
 
 describe('Test Northwind data extractor', async function () {
     const expectedTables = Object.keys(NORTHWIND)

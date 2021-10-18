@@ -1,5 +1,5 @@
 import { expect, assert } from 'chai'
-import { RDBMSSchema } from '../src/sql/schema'
+import { RDBMSSchema } from '../dist/sql/schema'
 import { NORTHWIND_SCHEMA_FILE, NORTHWIND } from './northwind.expect'
 
 describe('Test Northwind schema sql file parser', async function () {

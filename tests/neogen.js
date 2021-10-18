@@ -1,8 +1,8 @@
 import { expect, assert } from 'chai'
-import { NeoGenerator } from '../src/graph/neogen'
+import { NeoGenerator } from '../dist/graph/neogen'
 import { PARSED_TABLES, NM_TABLE, FINAL_TABLE } from './neo.test.data'
 import { PARSED_TABLES_SORTED } from './neo.test.expect'
-import { SqliteDataExtractor } from '../src/rdbms/sqlite'
+import { SqliteDataExtractor } from '../dist/rdbms/sqlite'
 import { NORTHWIND_DATA_FILE, NORTHWIND_CYPHER_FILE } from './northwind.expect'
 
 import { writeFile } from 'fs/promises'

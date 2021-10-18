@@ -1,13 +1,15 @@
 import sqlite3 from 'sqlite3'
 import { RDBMSSchema } from '../sql/schema'
+import { Table } from '../sql/interfaces'
 
 /**
  * sqlite data extractor
  */
 export class SqliteDataExtractor {
-    db = null
+    fileName: string
+    db: any
 
-    constructor (fileName) {
+    constructor (fileName: string) {
         this.fileName = fileName
         this.open()
     }
@@ -16,27 +18,27 @@ export class SqliteDataExtractor {
         this.db = new sqlite3.Database(this.fileName)
     }
 
-    async query (sql) {
+    async query (sql: string) : Promise<any> {
         return new Promise((res, rej) =>
-            this.db.all(sql, (err, rows) => err ? rej(err) : res(rows)))
+            this.db.all(sql, (err: string, rows: any[]) => err ? rej(err) : res(rows)))
     }
 
     async getSchema () {
         const res = await this.query("SELECT sql FROM sqlite_schema")
-        return res.map(r => r.sql).join(";\n")
+        return res.map((r: { sql: any }) => r.sql).join(";\n")
     }
 
-    async getTables () {
+    async getTables (): Promise<any> {
         const rdbmsSchema = new RDBMSSchema()
         return rdbmsSchema.parseSchemaDDL(await this.getSchema())
     }
 
-    async getTableTotalRecords (table) {
+    async getTableTotalRecords (table: Table) {
         const res = await this.query(`select count(*) as totalRecords from "${table.name}"`)
         return res[0].totalRecords
     }
 
-    async * read (table, chunkSize, totalRecords) {
+    async * read (table: Table, chunkSize: number, totalRecords: number) {
         if (!totalRecords) {
             totalRecords = await this.getTableTotalRecords(table)
         }
