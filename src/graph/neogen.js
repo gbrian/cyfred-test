@@ -51,7 +51,11 @@ export class NeoGenerator {
 
     generateNodeCypher (table) {
         const { name } = table
-        return (data, ix) => `CREATE (${'t'+ix}:${name} ${JSON.stringify(data, null, 2)})`
+        const dataBuilder = data => `{ ${
+            Object.keys(data).map(k => `\`${k}\`: ${JSON.stringify(data[k])}`)
+                .join(",\n")
+        } }`
+        return (data, ix) => `CREATE (${'t'+ix}:\`${name}\` ${dataBuilder(data)});`
     }
 
     generateRelationsCypher (table) {
@@ -65,10 +69,10 @@ export class NeoGenerator {
             const { tableName: tlName, fromColumn: tlFromColumn } = from
             const { tableName: trName, toColumn: trToColumn } = to
             return (
-                `MATCH (${tl}:${tlName}),(${tr}}:${trName})
-                WHERE ${tl}.${tlFromColumn} = "${data[tlFromColumn]}"
-                    AND ${tr}.${trToColumn} = "${data[trToColumn]}"
-                CREATE (${tl})-[${"r"+ix}:${name}]->(${tr})`
+                `MATCH (${tl}:\`${tlName}\`),(${tr}:\`${trName}\`)
+                WHERE ${tl}.${tlFromColumn} = ${JSON.stringify(data[tlFromColumn])}
+                    AND ${tr}.${trToColumn} = ${JSON.stringify(data[trToColumn])}
+                CREATE (${tl})-[${"r"+ix}:\`${name}\`]->(${tr});`
             )
         }
     }

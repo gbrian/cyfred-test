@@ -5,16 +5,20 @@ services:
     ports:
       - 7474:7474
       - 7687:7687
+    environment:
+      - NEO4J_AUTH=neo4j/CyferdTest!
+      - NEO4J_dbms_shell_enabled=true
   coder:
-    image: "cyferd-test/code-server:latest"
+    image: cyferd-test/code-server:latest
     build:
       context: .
     ports:
       - 9091:8080
     volumes:
-      - "$PWD/.config:/home/coder/.config"
-      - "$PWD:/home/coder/project"
+      - $PWD/.config:/home/coder/.config
+      - $PWD:/home/coder/project
     user: "0:0"
     environment:
-      - "DOCKER_USER=$USER"
-      - "PASSWORD=CyferdTest!"
+      - DOCKER_USER=$USER
+      - PASSWORD=CyferdTest!
+      - NEO4J_HOST=$IP
